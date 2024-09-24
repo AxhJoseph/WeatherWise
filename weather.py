@@ -3,6 +3,35 @@ import json
 import tkinter as tk
 from tkinter import messagebox
 
+def get_weather_gradient(weather_code):
+    weather_gradients = {
+        "1000": ("#FFD700", "#FF8C00"),  # Clear, Sunny
+        "1100": ("#FFE4B5", "#FF8C00"),  # Mostly Clear
+        "1101": ("#D3D3D3", "#A9A9A9"),  # Partly Cloudy
+        "1102": ("#A9A9A9", "#696969"),  # Mostly Cloudy
+        "1001": ("#808080", "#696969"),  # Cloudy
+        "2000": ("#C0C0C0", "#A9A9A9"),  # Fog
+        "2100": ("#D3D3D3", "#C0C0C0"),  # Light Fog
+        "4000": ("#ADD8E6", "#4682B4"),  # Drizzle
+        "4001": ("#0000FF", "#00008B"),  # Rain
+        "4200": ("#87CEFA", "#4682B4"),  # Light Rain
+        "4201": ("#0000CD", "#00008B"),  # Heavy Rain
+        "5000": ("#FFFFFF", "#B0C4DE"),  # Snow
+        "5001": ("#F0F8FF", "#B0C4DE"),  # Flurries
+        "5100": ("#E0FFFF", "#B0E0E6"),  # Light Snow
+        "5101": ("#B0E0E6", "#4682B4"),  # Heavy Snow
+        "6000": ("#E0FFFF", "#B0C4DE"),  # Freezing Drizzle
+        "6001": ("#ADD8E6", "#4682B4"),  # Freezing Rain
+        "6200": ("#87CEFA", "#4682B4"),  # Light Freezing Rain
+        "6201": ("#0000CD", "#00008B"),  # Heavy Freezing Rain
+        "7000": ("#B0C4DE", "#4682B4"),  # Ice Pellets
+        "7101": ("#4682B4", "#00008B"),  # Heavy Ice Pellets
+        "7102": ("#B0C4DE", "#4682B4"),  # Light Ice Pellets
+        "8000": ("#FFA07A", "#FF4500"),  # Thunderstorm
+    }
+
+    return weather_gradients.get(weather_code, ("#FFFFFF", "#FFFFFF"))  # default to white if weather code not found
+
 # Tomorrow.io API endpoint
 tomorrow_url = "https://api.tomorrow.io/v4/timelines"
 
@@ -62,8 +91,17 @@ def get_weather_data(api_key, location):
     else:
         print("Error:", response.status_code)
         return None
+    
 
 def display_weather_details(weather_data):
+    # Get the weather code from the JSON response
+    weather_code = weather_data['data']['timelines'][0]['intervals'][0]['values']['weatherCode']
+
+    # Get the gradient colors for the weather code
+    gradient_colors = get_weather_gradient(weather_code)
+
+    # Set the background color of the root window to the gradient colors
+    root.configure(bg=gradient_colors[0])  # set the background color to the first color in the gradient
     values = weather_data['data']['timelines'][0]['intervals'][0]['values']
     important_details = {
         "Temperature": f"{values['temperature']}°C",
@@ -92,44 +130,90 @@ def display_weather_details(weather_data):
     # Print the weather name
     text_box.insert(tk.END, f"Weather: {weather_name}\n")
 
-def search_weather():
+    # Disable the text box to prevent editing
+    text_box.config(state=tk.DISABLED)
+
+def search_weather(event=None):
     city_name = city_entry.get()
-    coordinates = get_coordinates(city_name)
-    if coordinates:
-        weather_data = get_weather_data(tomorrow_api_key, coordinates)
-        if weather_data:
-            display_weather_details(weather_data)
+    if city_name:
+        coordinates = get_coordinates(city_name)
+        if coordinates:
+            weather_data = get_weather_data(tomorrow_api_key, coordinates)
+            if weather_data:
+                display_weather_details(weather_data)
+                text_box.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
+                root.title(f"{city_name} Weather")
+                
+                # Create and place the credit button
+                credit_button = tk.Button(root, text="Credits", command=show_credits)
+                credit_button.place(relx=1, rely=1, anchor=tk.SE)
+            else:
+                messagebox.showerror("Error", "Failed to retrieve weather data")
         else:
-            messagebox.showerror("Error", "Failed to retrieve weather data")
+            messagebox.showerror("Error", "Failed to retrieve coordinates")
     else:
-        messagebox.showerror("Error", "Failed to retrieve coordinates")
+        messagebox.showerror("Error", "Please enter a city name")
+
+def show_credits():
+    # Hide the weather details
+    text_box.grid_remove()
+    
+    # Get current weather gradient
+    weather_code = 1000  # Placeholder for demonstration. Replace with the actual weather code if available.
+    gradient_colors = get_weather_gradient(str(weather_code))
+    
+    # Create and place the credit label
+    credit_label = tk.Label(root, text="Weather App created by Ashish Joseph", bg=gradient_colors[0], fg="#ffffff", font=("Arial", 18))
+    credit_label.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
+    
+    # Insert the GitHub logo code here
+    github_logo = tk.PhotoImage(file="weather/github_logo.png")
+    github_label = tk.Label(root, image=github_logo, bg=gradient_colors[0])
+    github_label.image = github_logo
+    github_label.grid(row=2, column=0, columnspan=3, padx=10, pady=10)
+    
+    github_link_label = tk.Label(root, text="GitHub: ", fg="blue", cursor="hand2", bg=gradient_colors[0], font=("Arial", 18))
+    github_link_label.grid(row=3, column=0, columnspan=3, padx=10, pady=10)
+    github_link_label.bind("<Button-1>", lambda e: open_github())
+    
+    # Create and place the back button
+    back_button = tk.Button(root, text="Back", command=go_back_to_weather)
+    back_button.grid(row=4, column=0, columnspan=3, padx=10, pady=10)
+
+def go_back_to_weather():
+    # Hide the credit label
+    for widget in root.grid_slaves():
+        widget.grid_remove()
+    
+    # Show the weather details again
+    text_box.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
+
+def open_github():
+    import webbrowser
+    webbrowser.open("https://github.com/ashishjoseph")
 
 # Create the main window
 root = tk.Tk()
 root.title("Weather App")
 
-# Set the background color
-root.configure(bg="#2ecc71")
+# Set system default background color
+root.configure(bg=root.cget("bg"))
 
-# Create the city entry field
-city_label = tk.Label(root, text="City:", bg="#2ecc71", fg="#ffffff", font=("Arial", 18))
+# Create a label for the city input
+city_label = tk.Label(root, text="Enter a city name:")
 city_label.grid(row=0, column=0, padx=10, pady=10)
-city_entry = tk.Entry(root, width=30, bg="#ecf0f1", fg="#000000", font=("Arial", 18))
-city_entry.grid(row=0, column=1, padx=10, pady=10)
 
-# Create the search button
-search_button = tk.Button(root, text="Search", command=search_weather, bg="#16a085", fg="#ffffff", font=("Arial", 18))
+# Create an entry widget for city input
+city_entry = tk.Entry(root)
+city_entry.grid(row=0, column=1, padx=10, pady=10)
+city_entry.bind("<Return>", search_weather)
+
+# Create a button to trigger the search
+search_button = tk.Button(root, text="Search", command=search_weather)
 search_button.grid(row=0, column=2, padx=10, pady=10)
 
-# Create the text box to display the weather details
-text_box = tk.Text(root, width=40, height=10, bg="#ecf0f1", fg="#000000", font=("Arial", 18))
-text_box.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
-
-# Add a weather icon
-weather_icon = tk.Label(root, text="", bg="#2ecc71", fg="#ffffff")
-weather_icon.grid(row=2, column=0, columnspan=3, padx=10, pady=10)
-weather_icon.config(text="")
-weather_icon.config(font=("Arial", 48))
+# Create a text box to display weather details
+text_box = tk.Text(root, width=50, height=15)
 
 # Start the main loop
 root.mainloop()
